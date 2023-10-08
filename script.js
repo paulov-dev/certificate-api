@@ -9,7 +9,6 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
 // Carregar o arquivo Excel
 const workbook = xlsx.readFile('login.xlsx');
 const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-const worksheetCert = workbook.Sheets[workbook.SheetNames[1]];
 
 // Extrair os dados de e-mail, senha e certificados do Excel
 const funcionarios = xlsx.utils.sheet_to_json(worksheet);
@@ -46,16 +45,16 @@ const createFolder = (name) => {
         // Aguardar o login ser concluído
         await page.waitForNavigation();
 
-        var cookies = await page.cookies();
+        let cookies = await page.cookies();
         const lmsToken = cookies.find(cookie => cookie.name === "lms.token");
 
         //Necessária validação semanal da URL abaixo, pois toda semana é feito a alteração.
-        var certificateResponse = await page.goto("https://conquerplus.com.br/_next/data/SfHfHWqLESwj4hCQwdrK7/certificates.json", { referer: "https://conquerplus.com.br/home" });
+        let certificateResponse = await page.goto("https://conquerplus.com.br/_next/data/MkBzaAYi-NNvyUC2n47dw/certificates.json", { referer: "https://conquerplus.com.br/home" });
         //await page.waitForNavigation()
-        var certificateResponseJson = await certificateResponse.json();
+        let certificateResponseJson = await certificateResponse.json();
 
         // TODO: Verificar se o JSON foi retornado corretamente e contém as propriedades a serem chamadas.
-        var certificateList = certificateResponseJson.pageProps.certificateList;
+        let certificateList = certificateResponseJson.pageProps.certificateList;
 
         const outputPath = "output"
         createFolder(outputPath);
@@ -80,28 +79,20 @@ const createFolder = (name) => {
             console.log("Nao existe certificados para o colaborador."); continue;
         }
 
-        var contextAPI = await browser.createIncognitoBrowserContext();
+        let contextAPI = await browser.createIncognitoBrowserContext();
         const pageAPI = await contextAPI.newPage();
 
         const certificatesInfoArray = [];
-        for await (var certificate of certificateList) {
-            var title = certificate.title;
-            //console.log(title)
-            var enrollmentId = certificate.enrollmentId;
+        for await (let certificate of certificateList) {
+            let title = certificate.title;
+            let enrollmentId = certificate.enrollmentId;
             await pageAPI.setExtraHTTPHeaders({
                 'authorization': decodeURI(lmsToken.value),
             });
 
+            let apiResponse = await pageAPI.goto(`https://api.conquerplus.com.br/api/certificate/getByEnrollmentId/${enrollmentId}`, { referer: "https://conquerplus.com.br/" });
 
-
-            //console.log(lmsToken.value)
-            var apiResponse = await pageAPI.goto(`https://api.conquerplus.com.br/api/certificate/getByEnrollmentId/${enrollmentId}`, { referer: "https://conquerplus.com.br/" });
-            //await page.waitForNavigation()
-            var apiResponseJson = await apiResponse.json();
-
-            //console.log(apiResponseJson)
-
-            // TODO: VERIFICAR SE CHEGOU O RESPONSE CORRETAMENTE, E BLA BLA BLA..
+            let apiResponseJson = await apiResponse.json();
 
             title = title.replace(/[^a-z0-9\u00C0-\u017F]/gi, '_').toLowerCase()
 
@@ -111,8 +102,6 @@ const createFolder = (name) => {
             if (apiResponseJson.status == "EMITTING") {
 
                 await pageAPI.goto(`https://api.conquerplus.com.br/api/certificate/enrollment/${enrollmentId}/emmit?testing=true`, { referer: "https://conquerplus.com.br/" });
-
-                //https://api.conquerplus.com.br/api/certificate/enrollment/6892190/emmit?testing=true
 
                 const linha = `${dataHoraAtual} - ERROR - ${funcionario.nome} - Certificado em emissão`;
 
@@ -125,21 +114,6 @@ const createFolder = (name) => {
             }
 
             certificatesInfoArray.push({ "title": title, "url": apiResponseJson.result.src, "name": certificate.title })
-
-            /*
-            const linha = `${dataHoraAtual} - SUCESSO - ${funcionario.nome} - ${certificate.title}`;
-
-                try {
-                    fs.appendFileSync('log.txt', linha + '\n');
-                } catch (error) {
-                    console.log('Ocorreu um erro ao adicionar a linha ao arquivo:', error);
-                }       
-                
-            console.log(`SUCESSO - ${funcionario.nome} - ${certificate.title}`)
-            */
-
-
-            // TODO: IMPLEMENTAR SLEEP DE 200-300ms - Segurança
             await delay(300);
         }
 
@@ -147,9 +121,9 @@ const createFolder = (name) => {
         contextAPI.close();
 
         //TODO: VERIFICAR SE JÁ EXISTE O ARQUIVO
-        var certificadosEsperadosExistentes = certificatesInfoArray.filter(x => certificadosEsperados.find(y => y == x.name));
-        for await (var certificateInfo of certificatesInfoArray) {
-            var pastaDestino = basePath;
+        let certificadosEsperadosExistentes = certificatesInfoArray.filter(x => certificadosEsperados.find(y => y == x.name));
+        for await (let certificateInfo of certificatesInfoArray) {
+            let pastaDestino = basePath;
             if (certificadosEsperadosExistentes.find(x => x.name == certificateInfo.name))
                 pastaDestino += "/realizados/";
             else
@@ -159,15 +133,7 @@ const createFolder = (name) => {
 
             //Verifica se já foi criado o arquivo
             if (fs.existsSync(`${pastaDestino}/${funcionario.nome} - ${certificateInfo.title}.pdf`)) {
-                /*
-            const linha = `${dataHoraAtual} - SUCESSO - ${funcionario.nome} - ${certificate.title}`;
 
-            try {
-                fs.appendFileSync('log.txt', linha + '\n');
-            } catch (error) {
-                console.log('Ocorreu um erro ao adicionar a linha ao arquivo:', error);
-            }
-            */
                 console.log(`RETORNO | ${funcionario.nome} - ${certificateInfo.title} já emitido`); continue;
 
             }
@@ -180,19 +146,6 @@ const createFolder = (name) => {
                 console.log('Ocorreu um erro ao adicionar a linha ao arquivo:', error);
             }
             console.log(`SUCESSO | ${funcionario.nome} - ${certificateInfo.title}`)
-
-            //apagar
-            try {
-                fs.appendFileSync('logNewNome.txt', funcionario.nome + '\n');
-            } catch (error) {
-                console.log('Ocorreu um erro ao adicionar a linha ao arquivo:', error);
-            }
-            //apagar
-            try {
-                fs.appendFileSync('logNewCert.txt', certificateInfo.title + '\n');
-            } catch (error) {
-                console.log('Ocorreu um erro ao adicionar a linha ao arquivo:', error);
-            }
 
 
             await page.goto(certificateInfo.url);
