@@ -15,7 +15,6 @@ Node.js: Este projeto foi desenvolvido usando Node.js, portanto, você precisar�
 
    ```bash
    git clone https://github.com/paulov-dev/certificate-api
-   cd pulse-app
    ```
 
 2. Instale as dependências do Node.js:
